@@ -1,0 +1,100 @@
+name: Refresh NFL touchdown board
+
+on:
+  push:
+    branches: ["main"]
+  schedule:
+    # Every four hours during the NFL regular-season calendar. Each game's
+    # candidate set freezes on the first run at/after kickoff minus 24 hours.
+    - cron: "15 */4 * 9-12,1 *"
+  workflow_dispatch:
+    inputs:
+      target_season:
+        description: Optional NFL season (for example, 2026)
+        required: false
+        type: string
+      target_week:
+        description: Optional NFL week (for example, 1)
+        required: false
+        type: string
+      run_backtest:
+        description: Also refresh the 2025 walk-forward backtest
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: nfl-td-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      TARGET_SEASON: ${{ inputs.target_season }}
+      TARGET_WEEK: ${{ inputs.target_week }}
+      TRAIN_START_SEASON: "2022"
+      MODEL_TYPE: logistic
+      BOARD_SIZE: "60"
+      NFLREADPY_CACHE: filesystem
+      NFLREADPY_CACHE_DIR: cache_nflverse
+      NFLREADPY_CACHE_DURATION: "86400"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Restore nflverse downloads
+        uses: actions/cache@v4
+        with:
+          path: cache_nflverse
+          key: nflverse-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: nflverse-${{ runner.os }}-
+      - name: Restore saved boards
+        uses: actions/cache@v4
+        with:
+          path: boards
+          key: td-board-history-${{ github.run_id }}
+          restore-keys: td-board-history-
+      - name: Restore official injury snapshots
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: td-injuries-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: td-injuries-${{ runner.os }}-
+      - run: pip install -r requirements.txt
+      - name: Build weekly probability board
+        run: python td_model.py run
+      - name: Refresh walk-forward backtest
+        if: ${{ inputs.run_backtest == true }}
+        run: python td_model.py backtest --season 2025 --train-end 2024
+      - name: Build website data
+        run: python build_site.py
+      - name: Save exact board artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nfl-td-board-${{ github.run_id }}
+          path: boards/**/*.csv
+          retention-days: 90
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Publish website
+        id: deployment
+        uses: actions/deploy-pages@v4
