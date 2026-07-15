@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#091426">
+  <title>NFL Anytime TD Board</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .position-tabs{display:flex;gap:8px;overflow:auto;padding:4px 0 14px}
+    .position-tab{white-space:nowrap;border:1px solid var(--line);background:var(--panel2);color:var(--muted);padding:8px 13px;border-radius:9px;font-weight:800;cursor:pointer}
+    .position-tab.active{border-color:var(--gold);color:var(--gold);background:#172844}
+    .weekly-results{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:16px;margin:0 0 18px}
+    .results-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px}.results-head h3{font-size:23px;margin:10px 0 0}
+    .results-controls{display:flex;gap:10px}.results-controls label{color:var(--muted);font-size:12px;font-weight:800}.results-controls select{display:block;margin-top:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px 30px 8px 10px}
+    .week-summary{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.result-chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 11px;color:var(--muted)}.result-chip strong{color:var(--text)}
+    .results-table{min-width:720px}.outcome{display:inline-block;border-radius:999px;padding:5px 9px;font-weight:900}.outcome.hit{background:#123e34;color:var(--accent)}.outcome.miss{background:#40232b;color:#ffb4a2}.outcome.void{background:#26344a;color:var(--muted)}
+    @media(max-width:760px){.results-head{align-items:flex-start;flex-direction:column}.results-controls{width:100%}.results-controls label{flex:1}.results-controls select{width:100%}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><p class="eyebrow">NFL MODEL</p><h1>Anytime TD Board</h1><p class="subtitle">Pregame touchdown probabilities, ranked by player.</p></div>
+    <a id="download" class="download" href="data/latest-board.csv">Download CSV</a>
+  </header>
+  <section class="summary">
+    <div><span>Slate</span><strong id="slate">Loading...</strong></div>
+    <div><span>Players ranked</span><strong id="count">--</strong></div>
+    <div><span>Last refreshed</span><strong id="updated">--</strong></div>
+  </section>
+  <nav class="tabs" aria-label="Board views">
+    <button class="tab active" data-view="players">Player board</button>
+    <button class="tab" data-view="games">Games</button>
+    <button class="tab" data-view="performance">Model performance</button>
+  </nav>
+  <section class="board">
+    <div class="board-title">
+      <div><p class="section-kicker" id="kicker">TOP 60</p><h2 id="title">Player breakdowns</h2></div>
+      <input id="search" type="search" placeholder="Find a player, team, or opponent" aria-label="Search board">
+    </div>
+    <div id="position-tabs" class="position-tabs" aria-label="Filter by position">
+      <button class="position-tab active" data-position="ALL">All</button>
+      <button class="position-tab" data-position="RB">Running backs</button>
+      <button class="position-tab" data-position="WR">Wide receivers</button>
+      <button class="position-tab" data-position="TE">Tight ends</button>
+      <button class="position-tab" data-position="QB">Quarterbacks</button>
+    </div>
+    <div id="players-view" class="table-wrap">
+      <table><thead><tr><th>Overall</th><th>Position rank</th><th>Player</th><th>Matchup</th><th>TD probability</th><th>Confidence</th><th>Model read</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+    </div>
+    <div id="games-view" class="games" hidden></div>
+    <div id="performance-view" hidden>
+      <div id="performance-cards" class="performance-cards"></div>
+      <section class="weekly-results">
+        <div class="results-head">
+          <div><p class="section-kicker">2025 REPLAY</p><h3>Week-by-week results</h3></div>
+          <div class="results-controls">
+            <label>Week <select id="result-week" aria-label="Select 2025 week"></select></label>
+            <label>Players <select id="result-limit" aria-label="Number of ranked players"><option value="5">Top 5</option><option value="10" selected>Top 10</option><option value="20">Top 20</option><option value="60">Top 60</option></select></label>
+          </div>
+        </div>
+        <div id="week-summary" class="week-summary"></div>
+        <div class="table-wrap"><table class="results-table"><thead><tr><th>Rank</th><th>Player</th><th>Matchup</th><th>Model probability</th><th>Actual result</th></tr></thead><tbody id="result-rows"></tbody></table></div>
+      </section>
+      <div class="notice"><strong>How to read this:</strong> Each game freezes separately on the first automated run at or after kickoff minus 24 hours. Later inactive players remain voids and are never replaced. Experimental changes appear here only as comparisons; the production ranking uses the version that held up best.</div>
+    </div>
+    <p id="error" class="error" hidden>The board is not available yet. The scheduled workflow may still be running.</p>
+  </section>
+  <section class="method">
+    <h2>What this board is</h2>
+    <p>The production ranking uses prior-game rushing and receiving role, red-zone and goal-line opportunities, team context, opponent defense, and roster continuity. Rule-era, rookie, injury, and expert-role layers are monitored separately and are promoted only after they improve an untouched test. Probabilities are estimates&mdash;not automatic bets.</p>
+  </section>
+  <footer>Gamble responsibly. Never risk more than you can afford to lose.</footer>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
