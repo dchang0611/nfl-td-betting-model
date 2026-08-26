@@ -1,10 +1,12 @@
 const tbody = document.querySelector('#rows');
 const search = document.querySelector('#search');
 const gamesView = document.querySelector('#games-view');
+const confluenceView = document.querySelector('#confluence-view');
 const performanceView = document.querySelector('#performance-view');
 const resultWeek = document.querySelector('#result-week');
 const resultLimit = document.querySelector('#result-limit');
 let rows = [], backtest = {metrics: []}, currentView = 'players', positionFilter = 'ALL';
+const confluenceState = {selected: ['Red-zone role', 'Inside-10 role', 'Goal-line / end-zone role'], minMatches: 2};
 
 const text = v => v ?? '--';
 const pct = v => v == null ? '--' : `${(Number(v) * 100).toFixed(1)}%`;
@@ -13,6 +15,56 @@ const esc = v => String(text(v)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const metric = (label, value) => `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`;
 const positionGroup = position => position === 'FB' ? 'RB' : position;
 const positionNames = {ALL:'Player breakdowns', RB:'Running backs', WR:'Wide receivers', TE:'Tight ends', QB:'Quarterbacks'};
+const positionLabels = {ALL:'All', RB:'Running backs', WR:'Wide receivers', TE:'Tight ends', QB:'Quarterbacks'};
+const factorDefinitions = [
+  {label:'Snap / route volume', test:r => Math.max(Number(r.snap_share_ewm)||0, Number(r.route_participation_ewm)||0) >= .75},
+  {label:'Red-zone role', test:r => Number(r.red_zone_opp_share_ewm) >= .20},
+  {label:'Inside-10 role', test:r => Number(r.inside10_opp_share_ewm) >= .20},
+  {label:'Goal-line / end-zone role', test:r => Math.max(Number(r.goal_line_rush_share_ewm)||0, Number(r.end_zone_target_share_ewm)||0) >= .25},
+  {label:'Stable role', test:r => Number(r.role_stability) >= .75},
+  {label:'Strong scoring environment', test:r => Number(r.team_implied_total) >= 24},
+  {label:'Vulnerable red-zone defense', test:r => Number(r.def_red_zone_td_rate_prior) >= .22},
+];
+
+const matchedFactors = row => factorDefinitions.filter(factor => factor.test(row)).map(factor => factor.label);
+const selectedMatches = row => matchedFactors(row).filter(label => confluenceState.selected.includes(label));
+const factorChips = row => confluenceState.selected.map(label => {
+  const matched = selectedMatches(row).includes(label);
+  return `<span class="factor-chip ${matched ? 'matched' : ''}">${matched ? '&#10003;' : '&#8212;'} ${esc(label)}</span>`;
+}).join('');
+
+function renderConfluenceControls() {
+  document.querySelector('#factor-selectors').innerHTML = factorDefinitions.map(({label}) => `<button type="button" class="factor-selector ${confluenceState.selected.includes(label) ? 'active' : ''}" data-factor="${esc(label)}" aria-pressed="${confluenceState.selected.includes(label)}">${esc(label)}</button>`).join('');
+  if (confluenceState.minMatches > confluenceState.selected.length) confluenceState.minMatches = confluenceState.selected.length;
+  document.querySelector('#factor-min').innerHTML = Array.from({length:confluenceState.selected.length}, (_, i) => i + 1).map(count => `<option value="${count}" ${count === confluenceState.minMatches ? 'selected' : ''}>At least ${count} of ${confluenceState.selected.length}</option>`).join('');
+}
+
+function renderConfluence() {
+  renderConfluenceControls();
+  const allReplay = (backtest.weeks || []).flatMap(week => week.rows || []).filter(r => positionFilter === 'ALL' || positionGroup(r.position) === positionFilter);
+  const gradedAll = allReplay.filter(r => Number(r.void) !== 1);
+  const baselineHits = gradedAll.filter(r => Number(r.scored_td) === 1).length;
+  const baseline = gradedAll.length ? baselineHits / gradedAll.length : null;
+  const replay = allReplay.filter(r => selectedMatches(r).length >= confluenceState.minMatches);
+  const graded = replay.filter(r => Number(r.void) !== 1);
+  const hits = graded.filter(r => Number(r.scored_td) === 1).length;
+  const misses = graded.length - hits;
+  const hitRate = graded.length ? hits / graded.length : null;
+  const lift = hitRate == null || baseline == null ? null : hitRate - baseline;
+  const label = confluenceState.selected.join(' + ');
+  document.querySelector('#confluence-performance').innerHTML = `<tr><td><strong>${esc(label)}</strong><br><small>AT LEAST ${confluenceState.minMatches} OF ${confluenceState.selected.length}</small></td><td>${hits}-${misses}</td><td class="prob">${pct(hitRate)}</td><td>${pct(baseline)}</td><td class="${lift > 0 ? 'lift-positive' : lift < 0 ? 'lift-negative' : ''}">${lift == null ? '--' : `${lift >= 0 ? '+' : ''}${(lift * 100).toFixed(1)} pts`}</td><td>${graded.length}</td><td>${replay.length - graded.length}</td></tr>`;
+  const current = rows.filter(r => (positionFilter === 'ALL' || positionGroup(r.position) === positionFilter) && selectedMatches(r).length >= confluenceState.minMatches);
+  document.querySelector('#confluence-summary').innerHTML = `<span class="result-chip"><strong>${current.length}</strong> current qualifiers</span><span class="result-chip"><strong>${graded.length}</strong> replay sample</span><span class="result-chip"><strong>${pct(hitRate)}</strong> historical hit rate</span>`;
+  document.querySelector('#confluence-rows').innerHTML = current.length ? current.map(r => `<tr><td class="rank">#${esc(r.ranking)}</td><td><strong>${esc(r.player_name)}</strong><br><small>${esc(r.position)} &middot; ${esc(r.team)}</small></td><td>${esc(r.team)} vs ${esc(r.opponent_team)}</td><td class="prob">${pct(r.model_probability)}</td><td class="confluence-score">${selectedMatches(r).length}/${confluenceState.selected.length}</td><td><div class="factor-chips">${factorChips(r)}</div></td></tr>`).join('') : '<tr><td colspan="6" class="muted">No current players meet this factor combination.</td></tr>';
+}
+
+function updatePositionTabCounts(sourceRows) {
+  document.querySelectorAll('.position-tab').forEach(tab => {
+    const position = tab.dataset.position;
+    const count = position === 'ALL' ? sourceRows.length : sourceRows.filter(r => positionGroup(r.position) === position).length;
+    tab.textContent = `${positionLabels[position]} (${count})`;
+  });
+}
 
 function details(r) {
   return `<tr class="detail-row" hidden><td colspan="8"><div class="detail-panel">
@@ -70,10 +122,10 @@ function renderPlayers(q = '') {
 document.querySelectorAll('.position-tab').forEach(tab => tab.addEventListener('click', () => {
   positionFilter = tab.dataset.position;
   document.querySelectorAll('.position-tab').forEach(t => t.classList.toggle('active', t === tab));
-  document.querySelector('#title').textContent = positionNames[positionFilter];
-  document.querySelector('#kicker').textContent = positionFilter === 'ALL' ? 'TOP 60' : `POSITION: ${positionFilter}`;
+  document.querySelector('#title').textContent = currentView === 'players' ? positionNames[positionFilter] : currentView === 'confluence' ? 'Factor confluence' : 'Model performance';
+  document.querySelector('#kicker').textContent = currentView === 'performance' ? (positionFilter === 'ALL' ? '2025 REPLAY: ALL POSITIONS' : `2025 REPLAY: ${positionFilter}`) : currentView === 'confluence' ? (positionFilter === 'ALL' ? 'CURRENT + 2025 REPLAY' : `CONFLUENCE: ${positionFilter}`) : (positionFilter === 'ALL' ? 'TOP 60' : `POSITION: ${positionFilter}`);
   document.querySelector('#download').href = positionFilter === 'ALL' ? 'data/latest-board.csv' : `data/latest-board-${positionFilter.toLowerCase()}.csv`;
-  renderPlayers(search.value);
+  render();
 }));
 
 function renderGames(q = '') {
@@ -96,21 +148,25 @@ function renderWeekResults() {
     return;
   }
   const limit = Number(resultLimit.value || 10);
-  const sample = selected.rows.filter(r => Number(r.board_rank) <= limit);
+  const positionRows = selected.rows.filter(r => positionFilter === 'ALL' || positionGroup(r.position) === positionFilter);
+  const sample = positionFilter === 'ALL' ? positionRows.filter(r => Number(r.board_rank) <= limit) : positionRows.slice(0, limit);
+  updatePositionTabCounts(selected.rows);
   const graded = sample.filter(r => Number(r.void) !== 1);
   const hits = graded.filter(r => Number(r.scored_td) === 1).length;
   const voids = sample.length - graded.length;
   document.querySelector('#week-summary').innerHTML = `
+    <span class="result-chip"><strong>${positionFilter === 'ALL' ? 'Overall' : positionFilter}</strong> Top ${Math.min(limit, sample.length)}</span>
     <span class="result-chip"><strong>${hits} / ${graded.length}</strong> hit</span>
     <span class="result-chip"><strong>${pct(graded.length ? hits / graded.length : null)}</strong> hit rate</span>
     <span class="result-chip"><strong>${voids}</strong> void${voids === 1 ? '' : 's'}</span>`;
-  document.querySelector('#result-rows').innerHTML = sample.map(r => {
+  document.querySelector('#result-rows').innerHTML = sample.map((r, index) => {
     const isVoid = Number(r.void) === 1;
     const isHit = Number(r.scored_td) === 1 && !isVoid;
     const touchdowns = Number(r.td_count) || 0;
     const outcomeClass = isVoid ? 'void' : isHit ? 'hit' : 'miss';
     const outcomeText = isVoid ? 'Void / did not play' : isHit ? `Hit${touchdowns > 1 ? ` (${touchdowns} TDs)` : ''}` : 'Miss';
-    return `<tr><td class="rank">#${esc(r.board_rank)}</td><td><strong>${esc(r.player_name)}</strong><br><small>${esc(r.position)} &middot; ${esc(r.team)}</small></td><td>${esc(r.team)} vs ${esc(r.opponent_team)}</td><td class="prob">${pct(r.model_probability)}</td><td><span class="outcome ${outcomeClass}">${outcomeText}</span></td></tr>`;
+    const rank = positionFilter === 'ALL' ? `#${esc(r.board_rank)}` : `#${index + 1} ${esc(positionFilter)}<br><small>#${esc(r.board_rank)} overall</small>`;
+    return `<tr><td class="rank">${rank}</td><td><strong>${esc(r.player_name)}</strong><br><small>${esc(r.position)} &middot; ${esc(r.team)}</small></td><td>${esc(r.team)} vs ${esc(r.opponent_team)}</td><td class="prob">${pct(r.model_probability)}</td><td><span class="outcome ${outcomeClass}">${outcomeText}</span></td></tr>`;
   }).join('');
 }
 
@@ -130,6 +186,7 @@ function renderPerformance() {
 function render() {
   if (currentView === 'players') renderPlayers(search.value);
   else if (currentView === 'games') renderGames(search.value);
+  else if (currentView === 'confluence') renderConfluence();
   else renderPerformance();
 }
 
@@ -138,23 +195,25 @@ document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', (
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
   document.querySelector('#players-view').hidden = currentView !== 'players';
   gamesView.hidden = currentView !== 'games';
+  confluenceView.hidden = currentView !== 'confluence';
   performanceView.hidden = currentView !== 'performance';
-  search.hidden = currentView === 'performance';
-  document.querySelector('#position-tabs').hidden = currentView !== 'players';
+  search.hidden = currentView === 'performance' || currentView === 'confluence';
+  document.querySelector('#position-tabs').hidden = currentView === 'games';
   document.querySelector('#kicker').textContent = currentView === 'performance' ? 'FIXED PREGAME TEST' : 'TOP 60';
-  document.querySelector('#title').textContent = currentView === 'players' ? positionNames[positionFilter] : currentView === 'games' ? 'Games and matchups' : 'Model performance';
-  if (currentView === 'players' && positionFilter !== 'ALL') document.querySelector('#kicker').textContent = `POSITION: ${positionFilter}`;
+  document.querySelector('#title').textContent = currentView === 'players' ? positionNames[positionFilter] : currentView === 'games' ? 'Games and matchups' : currentView === 'confluence' ? 'Factor confluence' : 'Model performance';
+  if (currentView === 'players') {
+    updatePositionTabCounts(rows);
+    if (positionFilter !== 'ALL') document.querySelector('#kicker').textContent = `POSITION: ${positionFilter}`;
+  }
+  if (currentView === 'performance') document.querySelector('#kicker').textContent = positionFilter === 'ALL' ? '2025 REPLAY: ALL POSITIONS' : `2025 REPLAY: ${positionFilter}`;
+  if (currentView === 'confluence') document.querySelector('#kicker').textContent = positionFilter === 'ALL' ? 'CURRENT + 2025 REPLAY' : `CONFLUENCE: ${positionFilter}`;
   render();
 }));
 
 fetch('data/board.json', {cache:'no-store'}).then(r => { if (!r.ok) throw Error(); return r.json(); }).then(data => {
   rows = data.rows || []; backtest = data.backtest || {metrics: []};
   resultWeek.innerHTML = (backtest.weeks || []).map(item => `<option value="${item.week}">Week ${item.week}</option>`).join('');
-  document.querySelectorAll('.position-tab').forEach(tab => {
-    const position = tab.dataset.position;
-    const count = position === 'ALL' ? rows.length : rows.filter(r => positionGroup(r.position) === position).length;
-    tab.textContent = `${tab.textContent} (${count})`;
-  });
+  updatePositionTabCounts(rows);
   document.querySelector('#slate').textContent = data.label;
   document.querySelector('#count').textContent = rows.length;
   document.querySelector('#updated').textContent = new Date(data.updatedAt).toLocaleString();
@@ -163,3 +222,14 @@ fetch('data/board.json', {cache:'no-store'}).then(r => { if (!r.ok) throw Error(
 search.addEventListener('input', render);
 resultWeek.addEventListener('change', renderWeekResults);
 resultLimit.addEventListener('change', renderWeekResults);
+document.querySelector('#factor-selectors').addEventListener('click', event => {
+  const button = event.target.closest('.factor-selector');
+  if (!button) return;
+  const factor = button.dataset.factor;
+  if (confluenceState.selected.includes(factor)) {
+    if (confluenceState.selected.length === 1) return;
+    confluenceState.selected = confluenceState.selected.filter(label => label !== factor);
+  } else confluenceState.selected = [...confluenceState.selected, factor];
+  renderConfluence();
+});
+document.querySelector('#factor-min').addEventListener('change', event => { confluenceState.minMatches = Number(event.target.value); renderConfluence(); });

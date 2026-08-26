@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#091426">
   <title>NFL Anytime TD Board</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="confluence.css?v=1">
   <style>
     .position-tabs{display:flex;gap:8px;overflow:auto;padding:4px 0 14px}
     .position-tab{white-space:nowrap;border:1px solid var(--line);background:var(--panel2);color:var(--muted);padding:8px 13px;border-radius:9px;font-weight:800;cursor:pointer}
@@ -32,6 +33,7 @@
   <nav class="tabs" aria-label="Board views">
     <button class="tab active" data-view="players">Player board</button>
     <button class="tab" data-view="games">Games</button>
+    <button class="tab" data-view="confluence">Factor confluence</button>
     <button class="tab" data-view="performance">Model performance</button>
   </nav>
   <section class="board">
@@ -50,6 +52,22 @@
       <table><thead><tr><th>Overall</th><th>Position rank</th><th>Player</th><th>Matchup</th><th>TD probability</th><th>Confidence</th><th>Model read</th><th></th></tr></thead><tbody id="rows"></tbody></table>
     </div>
     <div id="games-view" class="games" hidden></div>
+    <div id="confluence-view" hidden>
+      <section class="confluence-panel">
+        <div class="confluence-head">
+          <div><p class="section-kicker">DESCRIPTIVE SIGNAL CHECK</p><h3>Factor confluence</h3><p class="muted">Choose the football factors you want to combine. The same rule filters the current board and the frozen 2025 replay.</p></div>
+          <label class="match-control"><span>Match rule</span><select id="factor-min" aria-label="Minimum selected factors required"></select></label>
+        </div>
+        <div id="factor-selectors" class="factor-selectors" role="group" aria-label="Select confluence factors"></div>
+        <div id="confluence-summary" class="week-summary"></div>
+        <div class="table-wrap"><table class="confluence-table"><thead><tr><th>Selected combination</th><th>Record</th><th>TD hit rate</th><th>Baseline</th><th>Lift</th><th>Graded</th><th>Voids</th></tr></thead><tbody id="confluence-performance"></tbody></table></div>
+      </section>
+      <section class="confluence-panel">
+        <p class="section-kicker">CURRENT BOARD</p><h3>Qualifying players</h3>
+        <div class="table-wrap"><table class="confluence-table"><thead><tr><th>Rank</th><th>Player</th><th>Matchup</th><th>TD probability</th><th>Matches</th><th>Factor detail</th></tr></thead><tbody id="confluence-rows"></tbody></table></div>
+      </section>
+      <div class="notice"><strong>How to read this:</strong> Confluence describes which model inputs agree; it does not prove causation or change the production ranking. Historical results use frozen pregame boards and exclude voids.</div>
+    </div>
     <div id="performance-view" hidden>
       <div id="performance-cards" class="performance-cards"></div>
       <section class="weekly-results">
@@ -73,6 +91,6 @@
   </section>
   <footer>Gamble responsibly. Never risk more than you can afford to lose.</footer>
 </main>
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

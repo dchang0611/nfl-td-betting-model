@@ -76,7 +76,10 @@ def weekly_backtest_payload() -> list[dict]:
     columns = [
         "board_rank", "player_id", "player_name", "position", "team",
         "opponent_team", "model_probability", "confidence", "played", "void",
-        "scored_td", "td_count",
+        "scored_td", "td_count", "snap_share_ewm", "route_participation_ewm",
+        "red_zone_opp_share_ewm", "inside10_opp_share_ewm",
+        "goal_line_rush_share_ewm", "end_zone_target_share_ewm",
+        "role_stability", "team_implied_total", "def_red_zone_td_rate_prior",
     ]
     for path in source_paths:
         frame = pd.read_csv(path)
