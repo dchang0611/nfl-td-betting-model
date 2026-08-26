@@ -17,7 +17,9 @@ const metric = (label, value) => `<div class="metric"><span>${label}</span><stro
 const positionGroup = position => position === 'FB' ? 'RB' : position;
 const positionNames = {ALL:'Player breakdowns', RB:'Running backs', WR:'Wide receivers', TE:'Tight ends', QB:'Quarterbacks'};
 const positionLabels = {ALL:'All', RB:'Running backs', WR:'Wide receivers', TE:'Tight ends', QB:'Quarterbacks'};
-const factorValue = (row, factor) => Math.max(...factor.fields.map(field => Number(row[field])).filter(Number.isFinite));
+const factorValues = (row, factor) => factor.fields.map(field => row[field]).filter(value => value !== null && value !== undefined && value !== '').map(Number).filter(Number.isFinite);
+const factorValue = (row, factor) => Math.max(...factorValues(row, factor));
+const factorHasData = (row, factor) => factorValues(row, factor).length > 0;
 const factorMatches = (row, factor) => factorValue(row, factor) >= Number(factor.threshold);
 const matchedFactors = row => factorDefinitions.filter(factor => factorMatches(row, factor)).map(factor => factor.label);
 const selectedMatches = row => matchedFactors(row).filter(label => confluenceState.selected.includes(label));
@@ -55,6 +57,26 @@ function renderConfluence() {
   const current = rows.filter(r => (positionFilter === 'ALL' || positionGroup(r.position) === positionFilter) && selectedMatches(r).length >= confluenceState.minMatches);
   document.querySelector('#confluence-summary').innerHTML = `<span class="result-chip"><strong>${current.length}</strong> current qualifiers</span><span class="result-chip"><strong>${graded.length}</strong> replay sample</span><span class="result-chip"><strong>${pct(hitRate)}</strong> historical hit rate</span>`;
   document.querySelector('#confluence-rows').innerHTML = current.length ? current.map(r => `<tr><td class="rank">#${esc(r.ranking)}</td><td><strong>${esc(r.player_name)}</strong><br><small>${esc(r.position)} &middot; ${esc(r.team)}</small></td><td>${esc(r.team)} vs ${esc(r.opponent_team)}</td><td class="prob">${pct(r.model_probability)}</td><td class="confluence-score">${selectedMatches(r).length}/${confluenceState.selected.length}</td><td><div class="factor-chips">${factorChips(r)}</div></td></tr>`).join('') : '<tr><td colspan="6" class="muted">No current players meet this factor combination.</td></tr>';
+  renderFactorPerformance(allReplay, baseline);
+}
+
+function renderFactorPerformance(allReplay, baseline) {
+  const current = rows.filter(r => positionFilter === 'ALL' || positionGroup(r.position) === positionFilter);
+  const results = factorDefinitions.map(factor => {
+    const available = allReplay.filter(row => factorHasData(row, factor));
+    const matched = available.filter(row => factorMatches(row, factor));
+    const graded = matched.filter(row => Number(row.void) !== 1);
+    const hits = graded.filter(row => Number(row.scored_td) === 1).length;
+    const rate = graded.length ? hits / graded.length : null;
+    return {factor, available, matched, graded, hits, rate, lift:rate == null || baseline == null ? null : rate - baseline, pending:current.filter(row => factorMatches(row, factor)).length};
+  });
+  const fullyArchived = results.filter(item => item.available.length === allReplay.length).length;
+  document.querySelector('#factor-performance-notice').textContent = `${allReplay.length} frozen replay rows are tracked for ${positionFilter === 'ALL' ? 'all positions' : positionFilter}. ${fullyArchived} of ${factorDefinitions.length} factors have complete archived inputs; incomplete factors show their available coverage.`;
+  document.querySelector('#factor-performance-rows').innerHTML = results.map(({factor, available, matched, graded, hits, rate, lift, pending}) => {
+    const misses = graded.length - hits;
+    const coverage = allReplay.length ? available.length / allReplay.length : null;
+    return `<tr><td><strong>${esc(factor.label)}</strong><br><small>${esc(factor.description)} · ${pct(coverage)} input coverage</small></td><td>${graded.length ? `${hits}-${misses}` : '--'}</td><td>${pct(rate)}</td><td class="${lift > 0 ? 'lift-positive' : lift < 0 ? 'lift-negative' : ''}">${lift == null ? '--' : `${lift >= 0 ? '+' : ''}${(lift * 100).toFixed(1)} pts`}</td><td>${graded.length}</td><td>${matched.length - graded.length}</td><td>${pending}</td></tr>`;
+  }).join('');
 }
 
 function updatePositionTabCounts(sourceRows) {

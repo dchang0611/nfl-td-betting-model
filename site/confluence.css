@@ -16,4 +16,5 @@
 .lift-positive { color: var(--accent); font-weight: 900; }
 .lift-negative { color: #ffb4a2; font-weight: 900; }
 .confluence-score { color: var(--gold); font-weight: 900; }
+.factor-performance-notice { border-left: 3px solid var(--accent); background: var(--panel); color: var(--muted); padding: 12px 14px; margin: 16px 0; }.factor-performance-table td:not(:first-child),.factor-performance-table th:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
 @media (max-width: 760px) { .confluence-head { align-items: flex-start; flex-direction: column; } }
