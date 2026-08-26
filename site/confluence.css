@@ -10,6 +10,7 @@
 .factor-chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .factor-chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 3px 7px; color: var(--muted); font-size: 11px; white-space: nowrap; }
 .factor-chip.matched { border-color: #26775e; background: #123e34; color: var(--accent); }
+.factor-read { min-width: 250px; }.factor-read > strong { display: block; color: var(--gold); margin-bottom: 6px; }.factor-detail { grid-column: 1 / -1; border-left: 2px solid var(--accent); padding: 6px 9px; }.factor-detail > span { display: block; color: var(--muted); font-size: 11px; margin-bottom: 6px; }
 .confluence-table { min-width: 900px; }
 .lift-positive { color: var(--accent); font-weight: 900; }
 .lift-negative { color: #ffb4a2; font-weight: 900; }

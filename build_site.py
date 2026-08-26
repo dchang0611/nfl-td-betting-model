@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from factor_definitions import factor_read, matched_factor_labels, public_factor_definitions
+
 
 ROOT = Path(__file__).resolve().parent
 SITE = ROOT / "site"
@@ -142,6 +144,10 @@ def board_history() -> list[dict]:
 def main() -> None:
     path = latest_board()
     frame = pd.read_csv(path).sort_values("ranking")
+    matched = frame.apply(matched_factor_labels, axis=1)
+    frame["matched_factors"] = matched.map(" | ".join)
+    frame["factor_count"] = matched.map(len)
+    frame["model_note"] = frame.apply(factor_read, axis=1)
     columns = [
         "ranking", "target_season", "target_week", "nfl_game_id", "kickoff",
         "player_id", "player_name", "headshot_url", "team", "opponent_team",
@@ -150,7 +156,7 @@ def main() -> None:
         "rookie_flag", "rookie_season", "draft_round", "draft_pick",
         "rookie_specialist_probability", "snapshot_status", "planned_snapshot_utc",
         "actual_snapshot_utc", "board_cutoff", "scheduled_kickoff",
-        "model_note", "games_prior", "depth_rank", "roster_status", "new_team_flag",
+        "model_note", "matched_factors", "factor_count", "games_prior", "depth_rank", "roster_status", "new_team_flag",
         "injury", "practice_status", "game_status", "availability_probability",
         "current_team_games", "role_stability", "role_score", "recent_opportunities",
         "high_value_role_score", "snap_share_ewm", "route_participation_ewm",
@@ -169,6 +175,7 @@ def main() -> None:
         "week": week,
         "label": f"{season} Week {week}",
         "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "factorDefinitions": public_factor_definitions(),
         "rows": records(frame, columns),
         "history": board_history(),
         "backtest": backtest_payload(),

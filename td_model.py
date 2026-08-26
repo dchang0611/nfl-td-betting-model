@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 import anytime_td_model_v1 as core
+from factor_definitions import factor_read, matched_factor_labels
 
 
 ROOT = Path(__file__).resolve().parent
@@ -401,15 +402,10 @@ def explain_board(board: pd.DataFrame) -> pd.DataFrame:
         board["rush_share_ewm"],
         board["target_share_ewm"],
     )
-    board["model_note"] = np.select(
-        [
-            board["high_value_role_score"].ge(0.30),
-            board["role_score"].ge(0.25),
-            board["games_prior"].lt(3),
-        ],
-        ["Strong goal-line/red-zone role", "Strong recent workload", "Limited NFL sample"],
-        default="Matchup and scoring environment",
-    )
+    matched = board.apply(matched_factor_labels, axis=1)
+    board["matched_factors"] = matched.map(" | ".join)
+    board["factor_count"] = matched.map(len)
+    board["model_note"] = board.apply(factor_read, axis=1)
     return board
 
 
