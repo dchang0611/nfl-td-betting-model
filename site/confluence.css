@@ -1,3 +1,4 @@
+.games[hidden], #players-view[hidden], #confluence-view[hidden], #performance-view[hidden] { display: none !important; }
 .confluence-panel { background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin: 10px 0 16px; }
 .confluence-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
 .confluence-head h3, .confluence-panel > h3 { font-size: 23px; margin: 10px 0 4px; }
