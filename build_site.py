@@ -141,6 +141,41 @@ def board_history() -> list[dict]:
     return history
 
 
+def saved_week_payloads() -> list[dict]:
+    """Expose saved predictions unchanged; attach only explicit observed outcomes."""
+    observed_path = ROOT / "data" / "processed" / "player_game_features.parquet"
+    observed = pd.read_parquet(observed_path) if observed_path.exists() else pd.DataFrame()
+    weeks = []
+    for path in sorted(BOARDS.glob("anytime_td_board_????_week_??.csv"), reverse=True):
+        frame = pd.read_csv(path).sort_values("ranking")
+        if frame.empty:
+            continue
+        season, week = int(frame.target_season.iloc[0]), int(frame.target_week.iloc[0])
+        actual = observed.loc[observed.season.eq(season) & observed.week.eq(week)] if not observed.empty else observed
+        lookup = {}
+        if not actual.empty:
+            # Ambiguous duplicates never become graded results.
+            actual = actual.loc[~actual.duplicated(["player_id", "game_id"], keep=False)]
+            lookup = {(r.player_id, r.game_id): r for r in actual.itertuples()}
+        frame["matched_factors"] = frame.apply(matched_factor_labels, axis=1).map(" | ".join)
+        frame["model_note"] = frame.apply(factor_read, axis=1)
+        output = records(frame, list(frame.columns))
+        for row in output:
+            row.update(board_rank=row["ranking"], result_status="pending", scored_td=None, td_count=None, void=None)
+            result = lookup.get((row.get("player_id"), row.get("nfl_game_id")))
+            frozen_at = pd.to_datetime(row.get("actual_snapshot_utc"), utc=True, errors="coerce")
+            kickoff = pd.to_datetime(row.get("kickoff"), utc=True, errors="coerce")
+            if row.get("snapshot_status") != "frozen" or pd.isna(frozen_at) or pd.isna(kickoff) or frozen_at >= kickoff:
+                continue
+            if result is None or pd.isna(result.scored_td) or pd.isna(result.offense_snaps):
+                continue
+            row.update(scored_td=int(result.scored_td), td_count=clean(result.td_count), void=int(result.offense_snaps <= 0))
+            row["result_status"] = "void" if row["void"] else "hit" if row["scored_td"] else "miss"
+        weeks.append({"season": season, "week": week, "kind": "saved", "rows": output,
+                      "generatedAt": clean(frame.get("generated_at_utc", pd.Series([None])).iloc[0])})
+    return weeks
+
+
 def main() -> None:
     path = latest_board()
     frame = pd.read_csv(path).sort_values("ranking")
@@ -178,6 +213,7 @@ def main() -> None:
         "factorDefinitions": public_factor_definitions(),
         "rows": records(frame, columns),
         "history": board_history(),
+        "savedWeeks": saved_week_payloads(),
         "backtest": backtest_payload(),
     }
     data = SITE / "data"

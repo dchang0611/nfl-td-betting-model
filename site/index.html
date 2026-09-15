@@ -28,13 +28,14 @@
   <section class="summary">
     <div><span>Slate</span><strong id="slate">Loading...</strong></div>
     <div><span>Players ranked</span><strong id="count">--</strong></div>
-    <div><span>Last refreshed</span><strong id="updated">--</strong></div>
+    <div><span>Board generated</span><strong id="updated">--</strong></div>
   </section>
+  <div class="results-controls" style="margin:0 0 18px"><label>Season / week <select id="board-week" aria-label="Select board season and week"></select></label></div>
   <nav class="tabs" aria-label="Board views">
     <button class="tab active" data-view="players">Player board</button>
     <button class="tab" data-view="games">Games</button>
     <button class="tab" data-view="confluence">Factor confluence</button>
-    <button class="tab" data-view="performance">Model performance</button>
+    <button class="tab" data-view="performance">Historical performance</button>
   </nav>
   <section class="board">
     <div class="board-title">
@@ -55,7 +56,7 @@
     <div id="confluence-view" hidden>
       <section class="confluence-panel">
         <div class="confluence-head">
-          <div><p class="section-kicker">DESCRIPTIVE SIGNAL CHECK</p><h3>Factor confluence</h3><p class="muted">Choose the football factors you want to combine. The same rule filters the current board and the frozen 2025 replay.</p></div>
+          <div><p class="section-kicker">DESCRIPTIVE SIGNAL CHECK</p><h3>Factor confluence</h3><p class="muted">Choose the football factors you want to combine. The same rule filters the selected board and the frozen 2025 replay.</p></div>
           <label class="match-control"><span>Match rule</span><select id="factor-min" aria-label="Minimum selected factors required"></select></label>
         </div>
         <div id="factor-selectors" class="factor-selectors" role="group" aria-label="Select confluence factors"></div>
@@ -65,11 +66,11 @@
       <section class="confluence-panel">
         <p class="section-kicker">WHAT HAS ACTUALLY WORKED</p><h3>Factor performance</h3>
         <p id="factor-performance-notice" class="factor-performance-notice"></p>
-        <div class="table-wrap"><table class="confluence-table factor-performance-table"><thead><tr><th>Supporting factor</th><th>Record</th><th>TD rate</th><th>Lift vs baseline</th><th>Graded</th><th>Voids</th><th>Current pending</th></tr></thead><tbody id="factor-performance-rows"></tbody></table></div>
+        <div class="table-wrap"><table class="confluence-table factor-performance-table"><thead><tr><th>Supporting factor</th><th>Record</th><th>TD rate</th><th>Lift vs baseline</th><th>Graded</th><th>Voids</th><th>Selected-week matches</th></tr></thead><tbody id="factor-performance-rows"></tbody></table></div>
         <p class="muted">No units or ROI are shown because this dashboard does not archive executable anytime-touchdown prices.</p>
       </section>
       <section class="confluence-panel">
-        <p class="section-kicker">CURRENT BOARD</p><h3>Qualifying players</h3>
+        <p class="section-kicker">SELECTED WEEK</p><h3>Qualifying players</h3>
         <div class="table-wrap"><table class="confluence-table"><thead><tr><th>Rank</th><th>Player</th><th>Matchup</th><th>TD probability</th><th>Matches</th><th>Factor detail</th></tr></thead><tbody id="confluence-rows"></tbody></table></div>
       </section>
       <div class="notice"><strong>How to read this:</strong> Confluence describes which model inputs agree; it does not prove causation or change the production ranking. Historical results use frozen pregame boards and exclude voids.</div>
@@ -77,13 +78,14 @@
     <div id="performance-view" hidden>
       <section class="weekly-results">
         <div class="results-head">
-          <div><p class="section-kicker">2025 REPLAY</p><h3>Week-by-week results</h3></div>
+          <div><p class="section-kicker" id="results-source">SAVED WEEKLY BOARDS</p><h3>Week-by-week results</h3></div>
           <div class="results-controls">
-            <label>Week <select id="result-week" aria-label="Select 2025 week"></select></label>
+            <label>Season / week <select id="result-week" aria-label="Select results season and week"></select></label>
             <label>Players <select id="result-limit" aria-label="Number of ranked players"><option value="5">Top 5</option><option value="10" selected>Top 10</option><option value="20">Top 20</option><option value="60">Top 60</option></select></label>
           </div>
         </div>
         <div id="week-summary" class="week-summary"></div>
+        <p class="muted">Pending results are excluded from hit rates. Saved boards retain their original rankings; only frozen pregame predictions with confirmed outcome data are graded. Missing participation data remains pending.</p>
         <div class="table-wrap"><table class="results-table"><thead><tr><th>Rank</th><th>Player</th><th>Matchup</th><th>Model probability</th><th>Actual result</th></tr></thead><tbody id="result-rows"></tbody></table></div>
       </section>
       <div class="notice"><strong>How to read this:</strong> Each game freezes separately on the first automated run at or after kickoff minus 24 hours. Later inactive players remain voids and are never replaced. Experimental changes appear here only as comparisons; the production ranking uses the version that held up best.</div>
@@ -98,6 +100,6 @@
   </section>
   <footer>Gamble responsibly. Never risk more than you can afford to lose.</footer>
 </main>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
