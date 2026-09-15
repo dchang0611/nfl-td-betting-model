@@ -12,7 +12,8 @@ from __future__ import annotations
 import argparse
 import os
 import re
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Iterable
 
@@ -26,7 +27,7 @@ from factor_definitions import factor_read, matched_factor_labels
 
 ROOT = Path(__file__).resolve().parent
 TRAIN_START_SEASON = int(os.getenv("TRAIN_START_SEASON", "2022"))
-TARGET_DATE = os.getenv("TARGET_DATE", date.today().isoformat())
+TARGET_DATE = os.getenv("TARGET_DATE", "").strip() or datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()
 TARGET_SEASON = os.getenv("TARGET_SEASON", "").strip()
 TARGET_WEEK = os.getenv("TARGET_WEEK", "").strip()
 MODEL_TYPE = os.getenv("MODEL_TYPE", "logistic").strip().lower()
