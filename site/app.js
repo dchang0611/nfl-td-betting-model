@@ -3,12 +3,11 @@ const search = document.querySelector('#search');
 const gamesView = document.querySelector('#games-view');
 const confluenceView = document.querySelector('#confluence-view');
 const performanceView = document.querySelector('#performance-view');
-const resultWeek = document.querySelector('#result-week');
 const resultLimit = document.querySelector('#result-limit');
 const boardWeek = document.querySelector('#board-week');
 let availableWeeks = [], selectedWeek = null, downloadUrl = null;
 const weekKey = w => `${w.kind}-${w.season}-${w.week}`;
-const weekLabel = w => `${w.season} Week ${w.week} · ${w.kind === 'replay' ? 'Replay' : 'Saved board'}`;
+const weekLabel = w => `${w.season} Week ${w.week}`;
 const outcome = r => r.result_status || (Number(r.void) === 1 ? 'void' : r.scored_td == null ? 'pending' : Number(r.scored_td) === 1 ? 'hit' : 'miss');
 let rows = [], backtest = {metrics: []}, currentView = 'players', positionFilter = 'ALL';
 let factorDefinitions = [];
@@ -236,10 +235,9 @@ function updateDownload() {
 function selectWeek(key) {
   selectedWeek = availableWeeks.find(w => weekKey(w) === key) || availableWeeks[0];
   if (!selectedWeek) return;
-  boardWeek.value = resultWeek.value = weekKey(selectedWeek);
+  boardWeek.value = weekKey(selectedWeek);
   rows = selectedWeek.rows.map(r => ({...r, ranking:r.ranking ?? r.board_rank}));
   updatePositionTabCounts(rows);
-  document.querySelector('#slate').textContent = weekLabel(selectedWeek);
   document.querySelector('#count').textContent = rows.length;
   document.querySelector('#updated').textContent = selectedWeek.generatedAt ? new Date(selectedWeek.generatedAt).toLocaleString() : 'Archived replay';
   render();
@@ -270,11 +268,10 @@ fetch('data/board.json', {cache:'no-store'}).then(r => { if (!r.ok) throw Error(
   if (!factorDefinitions.length) throw Error('Factor definitions are missing from the board data.');
   const saved = data.savedWeeks?.length ? data.savedWeeks : [{season:data.season, week:data.week, rows:data.rows, generatedAt:data.updatedAt, kind:'saved'}];
   availableWeeks = [...saved, ...(backtest.weeks || []).map(w => ({...w, kind:'replay'}))].sort((a,b) => b.season-a.season || b.week-a.week);
-  boardWeek.innerHTML = resultWeek.innerHTML = availableWeeks.map(w => `<option value="${weekKey(w)}">${esc(weekLabel(w))}</option>`).join('');
+  boardWeek.innerHTML = availableWeeks.map(w => `<option value="${weekKey(w)}">${esc(weekLabel(w))}</option>`).join('');
   selectWeek(weekKey(availableWeeks[0]));
 }).catch(() => document.querySelector('#error').hidden = false);
 search.addEventListener('input', render);
-resultWeek.addEventListener('change', () => selectWeek(resultWeek.value));
 boardWeek.addEventListener('change', () => selectWeek(boardWeek.value));
 resultLimit.addEventListener('change', renderWeekResults);
 document.querySelector('#factor-selectors').addEventListener('click', event => {
