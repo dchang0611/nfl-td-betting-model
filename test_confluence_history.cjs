@@ -1,0 +1,17 @@
+const assert = require('node:assert/strict');
+const {confluenceHistory} = require('./site/confluence-history.js');
+const saved = (id, status = 'hit') => ({player_id:id, snapshot_status:'frozen', actual_snapshot_utc:'2026-10-01T00:00:00Z', scheduled_kickoff:'2026-10-02T00:00:00Z', result_status:status, scored_td:status === 'hit' ? 1 : null, red_zone_opp_share_ewm:0.3});
+const data = {season:2026, week:6, backtest:{weeks:[{season:2025,week:1,rows:[{player_id:'a',scored_td:1,void:0},{player_id:'b',scored_td:null}]}]},savedWeeks:[{season:2026,week:5,rows:[saved('a'),saved('c','pending'),saved('d','void'),saved('x'),saved('x'),{...saved('late'),actual_snapshot_utc:'2026-10-03T00:00:00Z'}]},{season:2026,week:6,rows:[saved('current')]}]};
+const before = JSON.stringify(data);
+const result = confluenceHistory(data);
+assert.equal(result.rows.length,5);
+assert.equal(result.excluded,3);
+assert.equal(result.weeks,2);
+assert.equal(result.rows.filter(r=>['hit','miss'].includes(r.result_status)).length,2);
+assert.equal(result.rows.filter(r=>r.result_status==='pending').length,2);
+assert.equal(JSON.stringify(data),before);
+assert.equal(result.rows.find(r=>r.player_id==='a' && r.snapshot_status).red_zone_opp_share_ewm,0.3);
+const next = confluenceHistory({...data,week:7});
+assert.equal(next.rows.length,6);
+assert.equal(next.weeks,3);
+console.log('Confluence history checks passed: rollover, outcomes, duplicates, kickoff eligibility, immutable inputs.');

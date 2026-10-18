@@ -11,6 +11,8 @@ const weekLabel = w => `${w.season} Week ${w.week}`;
 const outcome = r => r.result_status || (Number(r.void) === 1 ? 'void' : r.scored_td == null ? 'pending' : Number(r.scored_td) === 1 ? 'hit' : 'miss');
 let rows = [], backtest = {metrics: []}, currentView = 'players', positionFilter = 'ALL';
 let factorDefinitions = [];
+let confluenceArchive = {rows: [], excluded: 0, weeks: 0};
+const isGraded = row => ["hit", "miss"].includes(outcome(row));
 const confluenceState = {selected: ['Red-zone role', 'Inside-10 role', 'Goal-line / end-zone role'], minMatches: 2};
 
 const text = v => v ?? '--';
@@ -46,21 +48,22 @@ function renderConfluenceControls() {
 
 function renderConfluence() {
   renderConfluenceControls();
-  const allReplay = (backtest.weeks || []).flatMap(week => week.rows || []).filter(r => positionFilter === 'ALL' || positionGroup(r.position) === positionFilter);
-  const gradedAll = allReplay.filter(r => Number(r.void) !== 1);
-  const baselineHits = gradedAll.filter(r => Number(r.scored_td) === 1).length;
+  const allReplay = confluenceArchive.rows.filter(r => positionFilter === 'ALL' || positionGroup(r.position) === positionFilter);
+  const gradedAll = allReplay.filter(isGraded);
+  const baselineHits = gradedAll.filter(r => outcome(r) === 'hit').length;
   const baseline = gradedAll.length ? baselineHits / gradedAll.length : null;
   const replay = allReplay.filter(r => selectedMatches(r).length >= confluenceState.minMatches);
-  const graded = replay.filter(r => Number(r.void) !== 1);
-  const hits = graded.filter(r => Number(r.scored_td) === 1).length;
+  const graded = replay.filter(isGraded);
+  const hits = graded.filter(r => outcome(r) === 'hit').length;
   const misses = graded.length - hits;
   const hitRate = graded.length ? hits / graded.length : null;
   const lift = hitRate == null || baseline == null ? null : hitRate - baseline;
   const label = confluenceState.selected.join(' + ');
   document.querySelector('#confluence-performance').innerHTML = `<tr><td><strong>${esc(label)}</strong><br><small>AT LEAST ${confluenceState.minMatches} OF ${confluenceState.selected.length}</small></td><td>${hits}-${misses}</td><td class="prob">${pct(hitRate)}</td><td>${pct(baseline)}</td><td class="${lift > 0 ? 'lift-positive' : lift < 0 ? 'lift-negative' : ''}">${lift == null ? '--' : `${lift >= 0 ? '+' : ''}${(lift * 100).toFixed(1)} pts`}</td><td>${graded.length}</td><td>${replay.length - graded.length}</td></tr>`;
   const current = rows.filter(r => (positionFilter === 'ALL' || positionGroup(r.position) === positionFilter) && selectedMatches(r).length >= confluenceState.minMatches);
-  document.querySelector('#confluence-summary').innerHTML = `<span class="result-chip"><strong>${current.length}</strong> selected-week qualifiers</span><span class="result-chip"><strong>${graded.length}</strong> replay sample</span><span class="result-chip"><strong>${pct(hitRate)}</strong> historical hit rate</span>`;
+  document.querySelector('#confluence-summary').innerHTML = `<span class="result-chip"><strong>${current.length}</strong> selected-week qualifiers</span><span class="result-chip"><strong>${graded.length}</strong> historical sample</span><span class="result-chip"><strong>${pct(hitRate)}</strong> historical hit rate</span>`;
   document.querySelector('#confluence-rows').innerHTML = current.length ? current.map(r => `<tr><td class="rank">#${esc(r.ranking)}</td><td><strong>${esc(r.player_name)}</strong><br><small>${esc(r.position)} &middot; ${esc(r.team)}</small></td><td>${esc(r.team)} vs ${esc(r.opponent_team)}</td><td class="prob">${pct(r.model_probability)}</td><td class="confluence-score">${selectedMatches(r).length}/${confluenceState.selected.length}</td><td><div class="factor-chips">${factorChips(r)}</div></td></tr>`).join('') : '<tr><td colspan="6" class="muted">No selected-week players meet this factor combination.</td></tr>';
+  document.querySelector('#confluence-history-notice').textContent = `History automatically combines the 2025 replay with saved weeks before the latest board week. ${confluenceArchive.weeks} weeks included; ${confluenceArchive.excluded} duplicate or unverifiable rows excluded. Pending results and voids do not count as wins or losses.`;
   renderFactorPerformance(allReplay, baseline);
 }
 
@@ -69,13 +72,13 @@ function renderFactorPerformance(allReplay, baseline) {
   const results = factorDefinitions.map(factor => {
     const available = allReplay.filter(row => factorHasData(row, factor));
     const matched = available.filter(row => factorMatches(row, factor));
-    const graded = matched.filter(row => Number(row.void) !== 1);
-    const hits = graded.filter(row => Number(row.scored_td) === 1).length;
+    const graded = matched.filter(isGraded);
+    const hits = graded.filter(row => outcome(row) === 'hit').length;
     const rate = graded.length ? hits / graded.length : null;
     return {factor, available, matched, graded, hits, rate, lift:rate == null || baseline == null ? null : rate - baseline, pending:current.filter(row => factorMatches(row, factor)).length};
   });
   const fullyArchived = results.filter(item => item.available.length === allReplay.length).length;
-  document.querySelector('#factor-performance-notice').textContent = `${allReplay.length} frozen replay rows are tracked for ${positionFilter === 'ALL' ? 'all positions' : positionFilter}. ${fullyArchived} of ${factorDefinitions.length} factors have complete archived inputs; incomplete factors show their available coverage.`;
+  document.querySelector('#factor-performance-notice').textContent = `${allReplay.length} archived rows are tracked for ${positionFilter === 'ALL' ? 'all positions' : positionFilter}. ${fullyArchived} of ${factorDefinitions.length} factors have complete archived inputs; incomplete factors show their available coverage.`;
   document.querySelector('#factor-performance-rows').innerHTML = results.map(({factor, available, matched, graded, hits, rate, lift, pending}) => {
     const misses = graded.length - hits;
     const coverage = allReplay.length ? available.length / allReplay.length : null;
@@ -149,7 +152,7 @@ document.querySelectorAll('.position-tab').forEach(tab => tab.addEventListener('
   positionFilter = tab.dataset.position;
   document.querySelectorAll('.position-tab').forEach(t => t.classList.toggle('active', t === tab));
   document.querySelector('#title').textContent = currentView === 'players' ? positionNames[positionFilter] : currentView === 'confluence' ? 'Factor confluence' : 'Historical performance';
-  document.querySelector('#kicker').textContent = currentView === 'performance' ? (positionFilter === 'ALL' ? 'WEEKLY RESULTS: ALL POSITIONS' : `WEEKLY RESULTS: ${positionFilter}`) : currentView === 'confluence' ? (positionFilter === 'ALL' ? 'SELECTED BOARD + 2025 REPLAY' : `CONFLUENCE: ${positionFilter}`) : (positionFilter === 'ALL' ? 'TOP 60' : `POSITION: ${positionFilter}`);
+  document.querySelector('#kicker').textContent = currentView === 'performance' ? (positionFilter === 'ALL' ? 'WEEKLY RESULTS: ALL POSITIONS' : `WEEKLY RESULTS: ${positionFilter}`) : currentView === 'confluence' ? (positionFilter === 'ALL' ? 'SELECTED BOARD + ACCUMULATED HISTORY' : `CONFLUENCE: ${positionFilter}`) : (positionFilter === 'ALL' ? 'TOP 60' : `POSITION: ${positionFilter}`);
   render();
 }));
 
@@ -259,11 +262,12 @@ document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', (
     if (positionFilter !== 'ALL') document.querySelector('#kicker').textContent = `POSITION: ${positionFilter}`;
   }
   if (currentView === 'performance') document.querySelector('#kicker').textContent = positionFilter === 'ALL' ? 'WEEKLY RESULTS: ALL POSITIONS' : `WEEKLY RESULTS: ${positionFilter}`;
-  if (currentView === 'confluence') document.querySelector('#kicker').textContent = positionFilter === 'ALL' ? 'SELECTED BOARD + 2025 REPLAY' : `CONFLUENCE: ${positionFilter}`;
+  if (currentView === 'confluence') document.querySelector('#kicker').textContent = positionFilter === 'ALL' ? 'SELECTED BOARD + ACCUMULATED HISTORY' : `CONFLUENCE: ${positionFilter}`;
   render();
 }));
 
 fetch('data/board.json', {cache:'no-store'}).then(r => { if (!r.ok) throw Error(); return r.json(); }).then(data => {
+  confluenceArchive = confluenceHistory(data);
   rows = data.rows || []; backtest = data.backtest || {metrics: []}; factorDefinitions = data.factorDefinitions || [];
   if (!factorDefinitions.length) throw Error('Factor definitions are missing from the board data.');
   const saved = data.savedWeeks?.length ? data.savedWeeks : [{season:data.season, week:data.week, rows:data.rows, generatedAt:data.updatedAt, kind:'saved'}];

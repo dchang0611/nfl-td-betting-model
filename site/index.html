@@ -56,17 +56,18 @@
     <div id="confluence-view" hidden>
       <section class="confluence-panel">
         <div class="confluence-head">
-          <div><p class="section-kicker">DESCRIPTIVE SIGNAL CHECK</p><h3>Factor confluence</h3><p class="muted">Choose the football factors you want to combine. The same rule filters the selected board and the frozen 2025 replay.</p></div>
+          <div><p class="section-kicker">DESCRIPTIVE SIGNAL CHECK</p><h3>Factor confluence</h3><p class="muted">Choose the football factors you want to combine. The same rule filters the selected board and the 2025 replay plus completed saved weeks. New weekly results are included automatically as they become available.</p></div>
           <label class="match-control"><span>Match rule</span><select id="factor-min" aria-label="Minimum selected factors required"></select></label>
         </div>
         <div id="factor-selectors" class="factor-selectors" role="group" aria-label="Select confluence factors"></div>
+        <p id="confluence-history-notice" class="muted"></p>
         <div id="confluence-summary" class="week-summary"></div>
-        <div class="table-wrap"><table class="confluence-table"><thead><tr><th>Selected combination</th><th>Record</th><th>TD hit rate</th><th>Baseline</th><th>Lift</th><th>Graded</th><th>Voids</th></tr></thead><tbody id="confluence-performance"></tbody></table></div>
+        <div class="table-wrap"><table class="confluence-table"><thead><tr><th>Selected combination</th><th>Record</th><th>TD hit rate</th><th>Baseline</th><th>Lift</th><th>Graded</th><th>Pending / void</th></tr></thead><tbody id="confluence-performance"></tbody></table></div>
       </section>
       <section class="confluence-panel">
         <p class="section-kicker">WHAT HAS ACTUALLY WORKED</p><h3>Factor performance</h3>
         <p id="factor-performance-notice" class="factor-performance-notice"></p>
-        <div class="table-wrap"><table class="confluence-table factor-performance-table"><thead><tr><th>Supporting factor</th><th>Record</th><th>TD rate</th><th>Lift vs baseline</th><th>Graded</th><th>Voids</th><th>Selected-week matches</th></tr></thead><tbody id="factor-performance-rows"></tbody></table></div>
+        <div class="table-wrap"><table class="confluence-table factor-performance-table"><thead><tr><th>Supporting factor</th><th>Record</th><th>TD rate</th><th>Lift vs baseline</th><th>Graded</th><th>Pending / void</th><th>Selected-week matches</th></tr></thead><tbody id="factor-performance-rows"></tbody></table></div>
         <p class="muted">No units or ROI are shown because this dashboard does not archive executable anytime-touchdown prices.</p>
       </section>
       <section class="confluence-panel">
@@ -99,6 +100,7 @@
   </section>
   <footer>Gamble responsibly. Never risk more than you can afford to lose.</footer>
 </main>
-<script src="app.js?v=8"></script>
+<script src="confluence-history.js?v=1"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>
